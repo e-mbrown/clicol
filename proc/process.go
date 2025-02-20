@@ -5,22 +5,19 @@ import (
 	"image"
 	"image/color"
 	_ "image/jpeg"
-	"math"
 	"os"
 )
 
 // RGB range 0-255 == 0-100% intensity uses 8-bit color
 type RGBHist struct {
-	R, G, B [256]int
+	R, G, B [256]uint32
 	AlphaHist
 	profile string
 }
 
-// Cmyk range 0-100 because it measures ink coverage but
-// Not sure if ill have 256 vals or 100 vals, when I convert
-// the values.
+// Cmyk range 0-100 because it measures ink coverage
 type CMYKHist struct {
-	C, M, Y, K [256]int
+	C, M, Y, K [101]uint32
 	profile    string
 }
 
@@ -55,8 +52,11 @@ func Process(img string) error {
 	}
 
 	//TODO: Open two go routines or build out seperate function
-	rgbHist := populateRGBHist(alphaCol)
-	cmykHist := populateCMYKHist(alphaCol)
+	rH := populateRGBHist(alphaCol)
+	cH := populateCMYKHist(alphaCol)
+
+	fmt.Println("Red", rH.R)
+	fmt.Println("Magenta", cH.M)
 
 	return nil
 }
@@ -66,14 +66,12 @@ func populateCMYKHist(data []color.Color) *CMYKHist {
 	cmykH.profile = "SWOP"
 
 	for _, col := range data {
-		// normalize r' = r\total
 		r, g, b, _ := col.RGBA()
-		total := r + g + b
-		sTotal := math.Sqrt(float64(r ^ 2 + g ^ 2 + b ^ 2))
-		fmt.Println(total, sTotal)
-		//get cmy
-		// get k
-		// adjust
+		c, m, y, k := RGBtoCmyk(float32(r), float32(g), float32(b))
+		cmykH.C[c]++
+		cmykH.M[m]++
+		cmykH.Y[y]++
+		cmykH.K[k]++
 	}
 	return cmykH
 }
@@ -91,4 +89,21 @@ func populateRGBHist(data []color.Color) *RGBHist {
 	return rgbH
 }
 
-func NormRGB() {}
+func NormRGB(r, g, b float32) (rP, gP, bP float32) {
+	total := r + g + b
+	rP = (r / total)
+	gP = (g / total)
+	bP = (b / total)
+
+	return rP, gP, bP
+}
+
+func RGBtoCmyk(r, g, b float32) (c, m, y, k uint32) {
+	rP, gP, bP := NormRGB(r, g, b)
+	tk := 1 - max(rP, gP, bP)
+	tc := (1 - rP - tk) / (1 - tk)
+	tm := (1 - gP - tk) / (1 - tk)
+	ty := (1 - bP - tk) / (1 - tk)
+
+	return uint32(tc * 100), uint32(tm * 100), uint32(ty * 100), uint32(tk * 100)
+}
