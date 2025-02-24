@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	_ "image/jpeg"
+	jpeg "image/jpeg"
 	"os"
 )
 
@@ -24,7 +24,7 @@ type CMYKHist struct {
 // May delete but could find something interesting to use
 // for opacity information
 type AlphaHist struct {
-	A [256]int
+	A [256]uint32
 }
 
 func Process(img string) error {
@@ -33,7 +33,13 @@ func Process(img string) error {
 	if err != nil {
 		return err
 	}
+
+	writer, err := os.Create("proc/src/proc_test.jpg")
+	if err != nil {
+		return err
+	}
 	defer reader.Close()
+	defer writer.Close()
 
 	m, _, err := image.Decode(reader)
 	if err != nil {
@@ -53,10 +59,17 @@ func Process(img string) error {
 
 	//TODO: Open two go routines or build out seperate function
 	rH := populateRGBHist(alphaCol)
-	cH := populateCMYKHist(alphaCol)
+	// cH, cHkMax := populateCMYKHist(alphaCol)
 
-	fmt.Println("Red", rH.R)
-	fmt.Println("Magenta", cH.M)
+	res, err := MakeHistogram(rH, uint32(bounds.Max.X*bounds.Max.Y))
+	if err != nil {
+		return err
+	}
+
+	err = jpeg.Encode(writer, res, nil)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
