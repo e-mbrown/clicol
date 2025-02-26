@@ -1,6 +1,7 @@
 package proc
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -34,7 +35,7 @@ func drawGraph(img *image.RGBA) {
 	draw.Draw(yBar, yBar.Bounds(), image.White, image.Point{}, draw.Src)
 
 	xBar := image.NewRGBA(
-		image.Rectangle{Min: image.Point{50, 898}, Max: image.Point{950, 900}},
+		image.Rectangle{Min: image.Point{50, 900}, Max: image.Point{900, 901}},
 	)
 	draw.Draw(xBar, xBar.Bounds(), image.White, image.Point{}, draw.Src)
 
@@ -43,14 +44,23 @@ func drawGraph(img *image.RGBA) {
 }
 
 func populateGraph(img *image.RGBA, h *RGBHist, tPx uint32) {
-	var total uint32
 	lw := 900 / 260
 	sp := 53
 	ep := sp + lw
-	for _, bounds := range h.R {
-		total += bounds
+	_, binB := binColor(h.R)
+	binscale := [8]float64{}
+
+	for i, bin := range binB {
+		binscale[i] = float64(bin) / float64(tPx) * 850
+	}
+
+	fmt.Println(binscale)
+	for i, pix := range h.R {
+		y := float64(pix) / float64(binB[i>>5])
+		scaledY := y * 900
+		// fmt.Println(y, "----", scaledY)
 		bar := image.NewRGBA(
-			image.Rectangle{Min: image.Point{sp, 80}, Max: image.Point{ep, 900}},
+			image.Rectangle{Min: image.Point{sp, 900 - int(scaledY)}, Max: image.Point{ep, 900}},
 		)
 		sp = ep
 		ep = ep + lw
@@ -59,6 +69,17 @@ func populateGraph(img *image.RGBA, h *RGBHist, tPx uint32) {
 		draw.Draw(img, img.Bounds(), bar, image.Point{}, draw.Src)
 	}
 
+}
+
+func binColor(data [256]uint32) ([4]uint32, [8]uint32) {
+	binA := [4]uint32{}
+	binB := [8]uint32{}
+
+	for idx, pix := range data {
+		binA[idx>>6] += pix
+		binB[idx>>5] += pix
+	}
+	return binA, binB
 }
 
 func makeDefaultBChart() *BChart {
